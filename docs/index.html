@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>papercuts</title>
+<meta name="description" content="A one-line friction logger for coding agents. Every small snag lands in PAPERCUTS.md and a global queryable store.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="papercuts">
+<meta property="og:description" content="A one-line friction logger for coding agents. Every small snag lands in PAPERCUTS.md and a global queryable store.">
+<meta property="og:url" content="https://mastermakrela.github.io/papercuts/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="papercuts">
+<meta name="twitter:description" content="A one-line friction logger for coding agents. Every small snag lands in PAPERCUTS.md and a global queryable store.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%23ffe066'/%3E%3Cpath d='M20.5 12.5s4.2 5.2 4.2 7.6a4.2 4.2 0 1 1-8.4 0c0-2.4 4.2-7.6 4.2-7.6z' fill='%23b3202c'/%3E%3C/svg%3E">
+
+<style>
+/* ---------- font ---------- */
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/caveat-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2122, U+2212;
+}
+@font-face {
+  font-family: 'Caveat';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('fonts/caveat-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2122, U+2212;
+}
+
+/* ---------- tokens ---------- */
+:root {
+  --desk: #8e9c98;
+  --desk-ink: #1b2123;
+  --desk-ink-soft: #2c3436;
+  --desk-accent: #b3202c;
+
+  --paper: #fdfcf9;
+  --panel: #f2f0e8;
+  --ink: #22282a;
+  --ink-soft: #5c6360;
+  --rule: rgba(34, 40, 42, 0.16);
+
+  --accent: #b3202c;
+
+  --postit-a: #ffee94;
+  --postit-b: #ffe066;
+  --postit-c: #f5d052;
+  --postit-ink: #2c2411;
+  --postit-ink-soft: #4a3f18;
+
+  --tape: rgba(236, 240, 236, 0.60);
+  --tape-edge: rgba(120, 132, 128, 0.22);
+
+  --sh-1: 0 1px 1px rgba(30, 42, 39, 0.12), 0 6px 12px rgba(30, 42, 39, 0.16), 0 18px 34px rgba(30, 42, 39, 0.14);
+  --sh-2: 0 2px 3px rgba(30, 42, 39, 0.14), 0 12px 22px rgba(30, 42, 39, 0.18), 0 30px 50px rgba(30, 42, 39, 0.16);
+  --sh-postit: 0 1px 2px rgba(30, 42, 39, 0.20), 0 10px 18px rgba(30, 42, 39, 0.22), 0 26px 44px rgba(30, 42, 39, 0.20);
+
+  --body: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --hand: 'Caveat', 'Comic Sans MS', cursive;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --desk: #131617;
+    --desk-ink: #ccd3d1;
+    --desk-ink-soft: #9ba5a3;
+    --desk-accent: #e4707a;
+
+    --paper: #e4dfd4;
+    --panel: #d8d3c6;
+    --ink: #22262a;
+    --ink-soft: #53585a;
+    --rule: rgba(34, 38, 42, 0.20);
+
+    --accent: #a41d28;
+
+    --postit-a: #efd97e;
+    --postit-b: #e5cb62;
+    --postit-c: #d5bb51;
+    --postit-ink: #29230f;
+    --postit-ink-soft: #453a14;
+
+    --tape: rgba(186, 196, 193, 0.16);
+    --tape-edge: rgba(255, 255, 255, 0.08);
+
+    --sh-1: 0 1px 2px rgba(0, 0, 0, 0.42), 0 10px 24px rgba(0, 0, 0, 0.40), 0 26px 52px rgba(0, 0, 0, 0.34);
+    --sh-2: 0 2px 4px rgba(0, 0, 0, 0.46), 0 16px 32px rgba(0, 0, 0, 0.44), 0 36px 66px rgba(0, 0, 0, 0.38);
+    --sh-postit: 0 1px 2px rgba(0, 0, 0, 0.50), 0 12px 24px rgba(0, 0, 0, 0.46), 0 30px 54px rgba(0, 0, 0, 0.38);
+  }
+}
+
+/* ---------- base ---------- */
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  overflow-x: clip;
+  font-family: var(--body);
+  color: var(--desk-ink);
+  background-color: var(--desk);
+  background-image:
+    radial-gradient(1100px 620px at 20% -8%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 62%),
+    radial-gradient(900px 700px at 96% 108%, rgba(0, 0, 0, 0.10), rgba(0, 0, 0, 0) 60%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.014) 0 2px, rgba(0, 0, 0, 0) 2px 4px),
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.014) 0 2px, rgba(255, 255, 255, 0) 2px 4px);
+  background-repeat: no-repeat, no-repeat, repeat, repeat;
+  min-height: 100%;
+}
+
+.desk {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 32px 0;
+}
+
+a { color: inherit; }
+
+.vh {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- header / post-it ---------- */
+.head {
+  display: flex;
+  align-items: flex-end;
+  gap: 56px;
+  padding: 96px 0 100px;
+  margin-left: 26px;
+}
+
+.postit {
+  position: relative;
+  flex: 0 0 auto;
+  width: 322px;
+  min-height: 300px;
+  padding: 40px 34px 34px;
+  transform: rotate(-2deg);
+  background:
+    linear-gradient(166deg, var(--postit-a) 0%, var(--postit-b) 44%, var(--postit-c) 100%);
+  box-shadow: var(--sh-postit);
+}
+
+.postit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(200deg, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0) 34%);
+  pointer-events: none;
+}
+
+h1.postit-title {
+  font-family: var(--hand);
+  font-weight: 700;
+  font-size: 74px;
+  line-height: 0.94;
+  letter-spacing: 0.005em;
+  margin: 0;
+  color: var(--postit-ink);
+}
+
+.postit-sub {
+  font-family: var(--hand);
+  font-weight: 500;
+  font-size: 31px;
+  line-height: 1.15;
+  margin: 14px 0 0;
+  color: var(--postit-ink-soft);
+}
+
+/* ---------- blood ---------- */
+.drop,
+.bleed {
+  position: absolute;
+  z-index: 4;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.blood {
+  fill: var(--accent);
+  stroke: color-mix(in srgb, var(--accent) 68%, #16060a);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+.gloss { fill: #ffffff; opacity: 0.24; }
+
+.drop {
+  right: 52px;
+  bottom: 20px;
+  width: 26px;
+  height: 36px;
+}
+
+.drop .blood { stroke-width: 0.55; }
+
+.bleed-postit { right: 20px; bottom: -83px; }
+
+/* swelling droplet at the tip of the longest post-it drip */
+.bulb { transform-box: fill-box; transform-origin: 50% 0%; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .bulb { animation: swell 9s ease-in-out infinite; }
+}
+
+@keyframes swell {
+  0%, 55% { transform: translateY(0) scaleY(1); }
+  78%     { transform: translateY(3px) scaleY(1.16); }
+  100%    { transform: translateY(0) scaleY(1); }
+}
+
+/* the small paper scrap next to the post-it */
+.scrap {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  margin-bottom: 46px;
+  padding: 20px 24px 21px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.2;
+  text-decoration: none;
+  transform: rotate(3deg);
+  box-shadow: var(--sh-1);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.scrap span {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.scrap::before {
+  content: "";
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  width: 76px;
+  height: 24px;
+  margin-left: -38px;
+  transform: rotate(-3.5deg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)) , var(--tape);
+  border-left: 1px solid var(--tape-edge);
+  border-right: 1px solid var(--tape-edge);
+}
+
+.scrap:hover,
+.scrap:focus-visible {
+  transform: translateY(-2px) rotate(3deg);
+  box-shadow: var(--sh-2);
+}
+
+.scrap:hover span,
+.scrap:focus-visible span { color: var(--accent); }
+
+/* ---------- paper sheets ---------- */
+.sheet {
+  --rot: 0deg;
+  position: relative;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 38px 44px 40px;
+  transform: rotate(var(--rot));
+  box-shadow: var(--sh-1);
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.sheet:hover {
+  transform: translateY(-2px) rotate(var(--rot));
+  box-shadow: var(--sh-2);
+}
+
+.sheet-about   { --rot: 1.5deg;  width: 760px; margin-left: 24px; z-index: 1; }
+.sheet-cmds    { --rot: -1deg;   width: 630px; margin-left: auto; margin-right: 12px; margin-top: -20px; z-index: 3; }
+.sheet-setup   { --rot: 0.75deg; width: 830px; margin-left: 88px; margin-top: -16px; z-index: 2; }
+
+.bleed-about { right: -5px; top: 128px; }
+.bleed-cmds  { left: -6px;  top: -6px; }
+.bleed-setup { left: 64px;  bottom: -70px; }
+
+.sheet-cmds::before {
+  content: "";
+  position: absolute;
+  top: -13px;
+  right: 54px;
+  width: 88px;
+  height: 26px;
+  transform: rotate(2.5deg);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0)), var(--tape);
+  border-left: 1px solid var(--tape-edge);
+  border-right: 1px solid var(--tape-edge);
+}
+
+main { padding-bottom: 108px; }
+
+h2 {
+  font-size: clamp(1.32rem, 1.9vw, 1.7rem);
+  line-height: 1.22;
+  letter-spacing: -0.012em;
+  font-weight: 620;
+  margin: 0 0 16px;
+  color: var(--ink);
+}
+
+.lede {
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.68;
+  color: var(--ink);
+  max-width: 62ch;
+}
+
+/* ---------- PAPERCUTS.md excerpt ---------- */
+.doc { margin: 26px 0 0; }
+
+.doc-paper {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 18px 22px 20px;
+}
+
+.doc-name {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  color: var(--ink-soft);
+  margin: 0 0 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.log { font-family: var(--mono); font-size: 0.8125rem; line-height: 1.62; }
+
+.log p { margin: 0; }
+
+.log .date {
+  color: var(--ink-soft);
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.log .date:first-child { margin-top: 0; }
+
+.log .entry {
+  color: var(--ink);
+  padding-left: 1.4em;
+  text-indent: -1.4em;
+  margin-top: 4px;
+}
+
+.note {
+  font-family: var(--hand);
+  font-weight: 500;
+  font-size: 1.25rem;
+  line-height: 1.3;
+  color: var(--ink-soft);
+  margin: 14px 0 0;
+}
+
+/* ---------- command list ---------- */
+.cmds {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  column-gap: 30px;
+  row-gap: 4px;
+  margin: 22px 0 0;
+}
+
+.cmds dt {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.cmds dd {
+  margin: 0 0 12px;
+  font-size: 0.9375rem;
+  line-height: 1.62;
+  color: var(--ink-soft);
+}
+
+.cmds dd:last-of-type { margin-bottom: 0; }
+
+/* ---------- setup ---------- */
+.setup-p { margin: 0 0 20px; }
+
+.snip-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 4px;
+}
+
+.snip-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.09em;
+  color: var(--ink-soft);
+}
+
+.copy-btn {
+  font-family: var(--body);
+  font-size: 0.8125rem;
+  font-weight: 550;
+  line-height: 1;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.copy-btn:hover,
+.copy-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.copy-btn.is-copied { color: var(--accent); border-color: var(--accent); }
+
+pre.snip {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 18px 20px;
+  margin: 12px 0 0;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  tab-size: 2;
+}
+
+/* ---------- footer ---------- */
+.foot {
+  padding: 0 0 84px;
+  margin-left: 30px;
+  font-family: var(--hand);
+  font-weight: 500;
+  font-size: 1.375rem;
+  color: var(--desk-ink);
+}
+
+.foot p { margin: 0; }
+
+.foot a {
+  color: var(--desk-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--desk-accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
+.foot a:hover,
+.foot a:focus-visible { color: var(--desk-accent); }
+
+:focus-visible { outline: 2px solid var(--desk-accent); outline-offset: 3px; }
+
+.sheet :focus-visible,
+.postit :focus-visible { outline-color: var(--accent); }
+
+/* ---------- mobile ---------- */
+@media (max-width: 719px) {
+  .desk { padding: 0 18px; }
+
+  .head {
+    display: block;
+    margin-left: 0;
+    padding: 52px 0 40px;
+  }
+
+  .postit {
+    width: 100%;
+    max-width: 320px;
+    min-height: 0;
+    padding: 32px 26px 30px;
+  }
+
+  h1.postit-title { font-size: 62px; }
+  .postit-sub { font-size: 27px; }
+
+  .drop { right: 40px; bottom: 18px; }
+
+  .bleed-postit { right: 8px; }
+
+  .scrap {
+    display: inline-block;
+    /* clears the post-it drips, which hang ~86px below its lower edge */
+    margin: 104px 0 0;
+    transform: rotate(2deg);
+  }
+
+  .scrap:hover,
+  .scrap:focus-visible { transform: translateY(-2px) rotate(2deg); }
+
+  .sheet {
+    width: auto;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 26px 22px 28px;
+  }
+
+  .sheet-about { --rot: 0.5deg; }
+  .sheet-cmds  { --rot: -0.5deg; margin-top: 22px; }
+  .sheet-setup { --rot: 0.5deg;  margin-top: 22px; }
+
+  .sheet-cmds::before { right: 26px; }
+
+  .bleed-about { top: 96px; }
+  .bleed-cmds  { left: -12px; }
+  .bleed-setup { left: 16px; }
+
+  main { padding-bottom: 88px; }
+
+  .doc-paper { padding: 15px 15px 17px; }
+  .log { font-size: 0.78125rem; }
+
+  .cmds { display: block; margin-top: 18px; }
+  .cmds dt { white-space: normal; overflow-wrap: anywhere; }
+  .cmds dd { margin: 2px 0 16px; }
+
+  .snip-bar { padding-bottom: 12px; }
+  pre.snip { font-size: 0.78125rem; padding: 15px 15px; }
+
+  .foot { margin-left: 2px; padding-bottom: 56px; font-size: 1.25rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="desk">
+
+  <header class="head">
+    <div class="postit">
+      <h1 class="postit-title">papercuts</h1>
+      <p class="postit-sub">log the little cuts</p>
+      <svg class="drop" width="26" height="36" viewBox="0 0 14 19" aria-hidden="true" focusable="false">
+        <path class="blood" d="M7 0.4c0 0 6 7.3 6 11.6a6 6 0 1 1-12 0C1 7.7 7 0.4 7 0.4z"/>
+        <ellipse class="gloss" cx="4.9" cy="13" rx="1.5" ry="2.2" transform="rotate(-22 4.9 13)"/>
+      </svg>
+
+      <svg class="bleed bleed-postit" width="194" height="98" viewBox="0 -6 194 98" aria-hidden="true" focusable="false">
+        <path class="blood" d="M4 0 C56.1 -2.4 137.9 -2.3 190 0 C191.1 0.3 188.1 0.6 186.3 0.8 C180.5 5.6 176.6 10.6 173.4 10 C168.9 13.4 163.1 13.6 160.5 15.1 C158.4 29.8 152.3 52.1 155 63 C155 69.8 145 69.8 145 63 C147.8 52.1 141.6 29.8 139.5 14.5 C131.1 13.7 125.4 13.1 120.8 16.4 C114.2 15.1 105.8 13.4 102 14.6 C100.4 19.2 97.1 25.5 96.8 27.2 C96.8 31 91.2 31 91.2 27.2 C90.9 25.5 87.6 19.2 86 15.4 C77.3 15.2 71.6 13.9 66.8 17.6 C60 13.6 51.4 17 47.5 14.2 C45.6 24.2 42 38.1 41.6 44.4 C41.6 49.3 34.4 49.3 34.4 44.4 C34 38.1 30.4 24.2 28.5 15.8 C23.8 13.1 20.7 11.7 18.1 13.1 C14.5 10.3 9.8 1.6 7.7 1.6 C3 1 5 0.5 4 0 Z"/>
+        <g class="bulb">
+          <ellipse class="blood" cx="150" cy="74" rx="5.6" ry="7"/>
+          <ellipse class="gloss" cx="147.8" cy="72.2" rx="1.4" ry="2" transform="rotate(-24 147.8 72.2)"/>
+        </g>
+      </svg>
+    </div>
+
+    <a class="scrap" href="https://github.com/mastermakrela/papercuts"><span>View on GitHub</span></a>
+  </header>
+
+  <main>
+
+    <section class="sheet sheet-about" aria-labelledby="about-h">
+      <svg class="bleed bleed-about" width="22" height="284" viewBox="-2 -6 22 284" aria-hidden="true" focusable="false">
+        <path class="blood" d="M0 0 C5.1 -3.2 11.9 -3.2 17 0 C17 8.5 16.7 17 16.2 25 C16 33.5 15 42 14.3 50 C13.1 58.5 13 67 12.4 75 C12.1 83.5 11.6 92 11.6 100 C11.6 100 11.5 100.4 11.5 100 C10.8 116.2 10.5 140.6 10.3 155.6 C10.3 158.8 5.5 158.8 5.5 155.6 C5.3 140.6 5 116.2 4.3 100 C4.3 99.9 4.2 100.2 4.2 100 C4.3 91.5 3.5 83 3.5 75 C2.7 66.5 2.3 58 2.1 50 C1.4 41.5 0.9 33 0.7 25 C0.4 16.5 -0.4 8 0 0 Z"/>
+        <path class="blood" transform="translate(0 182)" d="M0.5 0 C4.1 -3.1 8.9 -2.8 12.5 0 C12.4 2.4 12.6 4.8 12 7 C12.2 9.4 11 11.8 10.9 14 C10.6 16.4 10.1 18.8 9.7 21 C9.5 23.4 9.6 25.8 9.2 28 C9.2 27.5 9.2 28 9.2 28 C8.6 45.9 7.4 72.8 8.9 89.3 C8.9 92.9 3.5 92.9 3.5 89.3 C5 72.8 3.8 45.9 3.2 28 C3.2 28.1 3.2 27.9 3.2 28 C3.2 25.6 2.5 23.2 2.8 21 C2 18.6 2.2 16.2 1.9 14 C1.8 11.6 1.6 9.2 0.9 7 C0.7 4.6 0.2 2.2 0.5 0 Z"/>
+      </svg>
+      <h2 id="about-h">The friction log your coding agents keep</h2>
+      <p class="lede">Agents hit tiny snags all day. A flaky command, a misleading error, a stale cache, a retried tool call. None of it blocks, so none of it gets written down. papercuts is a one-line logger for those moments: each entry lands in the repo's PAPERCUTS.md and in a global store you can query across projects.</p>
+
+      <figure class="doc">
+        <div class="doc-paper">
+          <p class="doc-name">PAPERCUTS.md</p>
+          <div class="log">
+            <p class="date">## 2026-08-08</p>
+            <p class="entry">- (opus-5) Building a discovery step with Bun's $ shell: literal glob args got expanded before reaching find, so the command silently matched nothing. Fix: use a pruning readdir walk.</p>
+            <p class="date">## 2026-08-11</p>
+            <p class="entry">- (fable-5) The copied node_modules had a broken .bin/tsc shim, so bunx tsc failed until a fresh bun install.</p>
+          </div>
+        </div>
+        <figcaption class="note">Real entries, logged while building this tool.</figcaption>
+      </figure>
+    </section>
+
+    <section class="sheet sheet-cmds" aria-labelledby="cmds-h">
+      <svg class="bleed bleed-cmds" width="31" height="132" viewBox="-2 -6 31 132" aria-hidden="true" focusable="false">
+        <path class="blood" d="M0 0 C7.2 -3 16.8 -3.4 24 0 C23.9 4.4 22.9 8.8 21.6 13 C20.4 17.4 18.2 21.8 16.4 26 C15 30.4 12.6 34.8 11.2 39 C9.4 43.4 9.3 47.8 8.8 52 C8.7 52.4 8.6 51.8 8.5 52 C7.7 70.5 7.4 98.2 7.1 115.3 C7.1 118.9 1.7 118.9 1.7 115.3 C1.4 98.2 1.1 70.5 0.3 52 C0.4 51.8 0.4 52.5 0.4 52 C0.3 47.6 0 43.2 0.3 39 C0 34.6 0.5 30.2 0.2 26 C0.5 21.6 -0.1 17.2 0.1 13 C-0.3 8.6 0.1 4.2 0 0 Z"/>
+      </svg>
+      <h2 id="cmds-h">Three commands</h2>
+      <dl class="cmds">
+        <dt>papercut -m &lt;model&gt; "message"</dt>
+        <dd>Log one papercut, in the moment.</dd>
+
+        <dt>papercuts</dt>
+        <dd>Query the global store. Filter by repo, text, or date.</dd>
+
+        <dt>papercut-review</dt>
+        <dd>Mine the whole session transcript with Haiku. Wired up as /papercut in Claude Code.</dd>
+      </dl>
+    </section>
+
+    <section class="sheet sheet-setup" aria-labelledby="setup-h">
+      <svg class="bleed bleed-setup" width="300" height="84" viewBox="0 -6 300 84" aria-hidden="true" focusable="false">
+        <path class="blood" d="M6 0 C86.6 -1.3 213.4 -1.2 294 0 C293.3 0.4 291.1 0.8 288.2 1.1 C281.1 5.3 276.3 8 272.4 10.3 C266.8 13.3 259.7 12.8 256.5 13.9 C254.8 21.7 251.6 34.7 251.3 40.7 C251.3 45.2 244.7 45.2 244.7 40.7 C244.4 34.7 241.2 21.7 239.5 13.5 C226.7 14.3 218.1 14.1 211 13.8 C201 10.7 188.2 12.8 182.5 12.5 C180.4 30.1 176.7 55.7 176.3 69.7 C176.3 75.5 167.7 75.5 167.7 69.7 C167.3 55.7 163.6 30.1 161.5 12.3 C152.6 12 146.7 14.2 141.8 14 C134.8 11.8 126 10.7 122 13.7 C120.4 18.6 117.2 27 116.9 30.1 C116.9 34 111.1 34 111.1 30.1 C110.8 27 107.6 18.6 106 13.5 C94.5 11.9 86.9 11.2 80.5 12.9 C71.6 15.3 60.1 11.8 55 12 C53.2 25 49.9 43.1 49.5 52.5 C49.5 57.2 42.5 57.2 42.5 52.5 C42.2 43.1 38.8 25 37 12.3 C31.3 12.1 27.5 9.9 24.4 12.6 C20 6.2 14.3 1.6 11.8 1.6 C5.7 1.1 5.3 0.5 6 0 Z"/>
+      </svg>
+      <h2 id="setup-h">Setup</h2>
+      <p class="lede setup-p">Bun on your PATH is the only requirement. Paste this into Claude Code:</p>
+
+      <div class="snip-bar">
+        <span class="snip-label" id="snip-label">SETUP PROMPT</span>
+        <button type="button" class="copy-btn" id="copy-btn" aria-describedby="snip-label">Copy</button>
+      </div>
+      <p class="vh" role="status" aria-live="polite" id="copy-status"></p>
+<pre class="snip" id="setup-prompt">Set up the papercuts tool (https://github.com/mastermakrela/papercuts) for me:
+
+1. Clone the repo to a permanent location (suggest ~/Scripts/papercuts unless I say
+   otherwise). If it's already cloned, use that clone.
+2. Symlink the three scripts into ~/.local/bin (mkdir -p it, and warn me if it's not
+   on my PATH):
+   ln -s &lt;clone&gt;/log.ts    ~/.local/bin/papercut
+   ln -s &lt;clone&gt;/report.ts ~/.local/bin/papercuts
+   ln -s &lt;clone&gt;/review.ts ~/.local/bin/papercut-review
+3. Install the /papercut slash command: copy install/SKILL.md to
+   ~/.claude/skills/papercut/SKILL.md (create the directory).
+4. Append the contents of install/claude-md-snippet.md as a new section of my global
+   ~/.claude/CLAUDE.md. This is what tells agents to log papercuts proactively.
+   Skip this step if I already have a "Log papercuts" section; ask before rewording
+   anything that's already there.
+5. Verify: `command -v papercut`, then in some scratch git repo run
+   `papercut -m setup-test "papercuts installed"` and show me the PAPERCUTS.md line
+   and the matching line in ~/.claude/papercuts/log.jsonl.</pre>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <p>MIT license, built by <a href="https://github.com/mastermakrela">mastermakrela</a></p>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  var btn = document.getElementById('copy-btn');
+  var src = document.getElementById('setup-prompt');
+  var live = document.getElementById('copy-status');
+  var timer;
+
+  function ok() {
+    btn.textContent = 'Copied';
+    btn.classList.add('is-copied');
+    live.textContent = 'Setup prompt copied to clipboard';
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      btn.textContent = 'Copy';
+      btn.classList.remove('is-copied');
+      live.textContent = '';
+    }, 2400);
+  }
+
+  function legacy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '0';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); ok(); }
+    catch (e) { live.textContent = 'Copy failed, please select the text manually'; }
+    document.body.removeChild(ta);
+  }
+
+  btn.addEventListener('click', function () {
+    var text = src.textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(ok, function () { legacy(text); });
+    } else {
+      legacy(text);
+    }
+  });
+})();
+</script>
+</body>
+</html>
