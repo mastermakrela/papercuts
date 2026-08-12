@@ -20,7 +20,10 @@ Every papercut lands in two places:
   Single-line appends under `O_APPEND` are atomic, so parallel agent sessions can't
   interleave.
 
-This repo's own [`PAPERCUTS.md`](PAPERCUTS.md) was logged while building it.
+`PAPERCUTS.md` is local-only and should be gitignored, including in this repo. It is
+your friction log, not repo content. The entries shown on
+[the site](https://mastermakrela.github.io/papercuts/) were logged while building this
+tool.
 
 ## The three commands
 
@@ -56,9 +59,14 @@ Set up the papercuts tool (https://github.com/mastermakrela/papercuts) for me:
    ~/.claude/CLAUDE.md — this is what tells agents to log papercuts proactively.
    Skip this step if I already have a "Log papercuts" section; ask before rewording
    anything that's already there.
-5. Verify: `command -v papercut`, then in some scratch git repo run
-   `papercut -m setup-test "papercuts installed"` and show me the PAPERCUTS.md line
-   and the matching line in ~/.claude/papercuts/log.jsonl.
+5. Add a global gitignore rule so my friction logs never get committed anywhere:
+   append PAPERCUTS.md to the file named by `git config --get core.excludesfile`
+   (default ~/.config/git/ignore; create it and point core.excludesfile at it if it
+   is not set yet).
+6. Verify: `command -v papercut`, then in some scratch git repo run
+   `papercut -m setup-test "papercuts installed"` and show me the PAPERCUTS.md line,
+   the matching line in ~/.claude/papercuts/log.jsonl, and that `git status` in that
+   repo does NOT list PAPERCUTS.md.
 ```
 
 Manual setup is the same thing by hand: clone, the three symlinks,
@@ -73,6 +81,8 @@ Manual setup is the same thing by hand: clone, the three symlinks,
   agent tool shells.
 - `/papercut` is deliberately user-triggered only (`disable-model-invocation: true`);
   in-the-moment `papercut` calls are the proactive path.
+- The setup prompt tells your agent to keep `PAPERCUTS.md` out of version control, so
+  a friction log never turns into a diff someone has to review.
 - `PAPERCUTS.md` is distinct from a changelog (what was accomplished) and from your
   issue tracker (real bugs / tracked work). Papercuts are the stuff too small for
   either.

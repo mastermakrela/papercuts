@@ -16,6 +16,13 @@ To mine a whole session for papercuts at once, the `/papercut` slash command run
 This is user-triggered only via `/papercut` — don't run the review yourself
 unprompted.
 
+`PAPERCUTS.md` is a local-only file, not repo content. Never stage or commit it, and
+never let it ride along in a commit you make for other work. The first time you log a
+papercut in a repo, make sure it is ignored: add `PAPERCUTS.md` to the repo's
+`.gitignore`, or to `.git/info/exclude` if you would rather not touch a tracked file
+(client repos, shared branches). A team that wants a shared friction log can decide to
+commit it instead, but that is an explicit choice, not the default.
+
 Papercuts resolve `PAPERCUTS.md` to the repo's main worktree root (via
 `git rev-parse --git-common-dir`), never the literal cwd — so papercuts logged from a
 linked worktree land in the same file as ones logged from the main worktree, and

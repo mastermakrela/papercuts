@@ -657,9 +657,14 @@ pre.snip {
    ~/.claude/CLAUDE.md. This is what tells agents to log papercuts proactively.
    Skip this step if I already have a "Log papercuts" section; ask before rewording
    anything that's already there.
-5. Verify: `command -v papercut`, then in some scratch git repo run
-   `papercut -m setup-test "papercuts installed"` and show me the PAPERCUTS.md line
-   and the matching line in ~/.claude/papercuts/log.jsonl.</pre>
+5. Add a global gitignore rule so my friction logs never get committed anywhere:
+   append PAPERCUTS.md to the file named by `git config --get core.excludesfile`
+   (default ~/.config/git/ignore; create it and point core.excludesfile at it if it
+   is not set yet).
+6. Verify: `command -v papercut`, then in some scratch git repo run
+   `papercut -m setup-test "papercuts installed"` and show me the PAPERCUTS.md line,
+   the matching line in ~/.claude/papercuts/log.jsonl, and that `git status` in that
+   repo does NOT list PAPERCUTS.md.</pre>
     </section>
 
   </main>

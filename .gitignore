@@ -1,1 +1,4 @@
 node_modules/
+
+# local-only friction log, never committed (see install/claude-md-snippet.md)
+PAPERCUTS.md
