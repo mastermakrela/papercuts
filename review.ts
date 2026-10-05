@@ -1,6 +1,12 @@
 #!/usr/bin/env bun
 import { readdir, stat } from "node:fs/promises";
-import { appendPapercuts, resolvePapercutsDir } from "./common.ts";
+import {
+	appendPapercuts,
+	readResolutions,
+	regressionHint,
+	regressionsOf,
+	resolvePapercutsDir,
+} from "./common.ts";
 
 const sessionCwd = process.argv[2] ?? process.cwd();
 const encoded = sessionCwd.replace(/[/.]/g, "-");
@@ -114,8 +120,17 @@ if (!entries.length) {
 	process.exit(0);
 }
 
-await appendPapercuts(
+const records = await appendPapercuts(
 	papercutsDir,
 	entries.map((e) => ({ model: "haiku via /papercut", message: e.message })),
+	"review",
 );
 console.log(`Logged ${entries.length} papercut(s) to ${papercutsDir}/PAPERCUTS.md`);
+
+// Entries matching an already-resolved pattern mean that fix did not take.
+const resolutions = await readResolutions();
+for (const r of records) {
+	for (const res of regressionsOf(r, resolutions)) {
+		console.error(`[${r.message.slice(0, 60)}…] ${regressionHint(res)}`);
+	}
+}

@@ -31,7 +31,31 @@ tool.
 | --- | --- |
 | `papercut -m <model> "message"` | Log one papercut from the current directory's repo. Agents call this in the moment, per an instruction in your global `CLAUDE.md`. |
 | `papercut-review` | Mine the *whole current session* for papercuts at once: finds the newest Claude Code transcript for the cwd, feeds it to Haiku via `claude -p --model haiku` (no separate API key needed), appends what it finds. Wired up as the `/papercut` slash command. |
-| `papercuts` | Query the global store: `--repo <substr>`, `--grep <substr>`, `--since`/`--until`/`--year`, `--list` (full text), `--json`. No flags prints tallies by repo, model, and date. |
+| `papercuts` | Query the global store: `--repo <substr>`, `--grep <substr>`, `--since`/`--until`/`--year`, `--list` (full text, with ids), `--json`. No flags prints tallies by repo, model, and date — open papercuts only, plus a "possible regressions" section (see below). `--all` includes resolved entries, `--resolved` shows only them. |
+| `papercuts resolve` | Mark papercuts as addressed: `papercuts resolve <id>... -m "what fixed it"` or `papercuts resolve --grep <substr> [--repo R] [--until YYYY-MM-DD] -m "what fixed it"` (`-n` previews). `papercuts unresolve <id>...` reopens. |
+
+## Resolving papercuts
+
+A friction log is only useful if it shrinks when you sand something down. Once a
+fix is in place:
+
+```
+papercuts resolve --grep "paraglide" --repo wirtgen --until 2026-08-20 \
+  -m "apps/web prepare script now runs paraglide-js compile"
+```
+
+- Resolutions are append-only records in `~/.claude/papercuts/resolutions.jsonl`
+  (next to the log; a `PAPERCUTS_LOG` override redirects both). Entries are
+  identified by a stable 8-char id derived from the record itself, so the existing
+  store needs no migration. `--list` and `--json` print the ids.
+- `--grep` resolutions store the pattern. A later papercut matching that pattern is
+  evidence the fix did not take: `papercut` prints a hint when logging one, and the
+  report lists them under "possible regressions". `--until` says "fixed by that date"
+  so only newer entries count; without it, newer-than-the-resolution counts.
+- Resolved entries are removed from the affected repos' `PAPERCUTS.md` (exact message
+  match; `--keep-md` skips that). The global store keeps everything.
+- `papercuts unresolve <id>...` reopens entries (the markdown lines are not restored).
+- A pattern starting with a dash needs the `=` form: `--grep=--attach`.
 
 ## Setup
 

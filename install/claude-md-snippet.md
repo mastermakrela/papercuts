@@ -32,6 +32,15 @@ Every papercut ALSO appends to a global append-only store at
 `~/.claude/papercuts/log.jsonl` (repo, branch, model, date, source), so friction can
 be queried across all projects — most of it turns out to be shared global-setup
 issues, not per-project ones. Query it with `papercuts`: `--repo <substr>`,
-`--grep <substr>`, `--since/--until/--year`, `--list` (full text), `--json`. When I
-ask what's been going wrong across projects, read this store rather than grepping
-individual repos.
+`--grep <substr>`, `--since/--until/--year`, `--list` (full text, with ids), `--json`.
+When I ask what's been going wrong across projects, read this store rather than
+grepping individual repos.
+
+The report shows OPEN papercuts only. When a fix for a logged papercut is in place
+(a hook changed, a rule documented, a prepare script added), consume it:
+`papercuts resolve --grep <substr> [--repo R] [--until YYYY-MM-DD] -m "<what fixed it>"`
+(`-n` previews; or `papercuts resolve <id>... -m …` with ids from `--list`). This
+removes the lines from the affected `PAPERCUTS.md` files and stores the pattern, so a
+later papercut matching it is reported as a possible regression — `papercut` prints a
+hint when you log one. `papercuts unresolve <id>` reopens. Only resolve what you
+verified in code or config, never on a guess.
