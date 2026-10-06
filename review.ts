@@ -11,7 +11,7 @@ import {
 const sessionCwd = process.argv[2] ?? process.cwd();
 const encoded = sessionCwd.replace(/[/.]/g, "-");
 const transcriptsDir = `${process.env.HOME}/.claude/projects/${encoded}`;
-const papercutsDir = await resolvePapercutsDir(sessionCwd);
+const { dir: papercutsDir } = await resolvePapercutsDir(sessionCwd);
 
 const files = (await readdir(transcriptsDir)).filter((f) => f.endsWith(".jsonl"));
 if (!files.length) {
@@ -113,7 +113,9 @@ const entries = out
 			return null;
 		}
 	})
-	.filter((e): e is { message: string } => !!e?.message);
+	.filter((e): e is { message: string } => !!e?.message)
+	// One batch shares a timestamp, and ids derive from ts+message: drop exact repeats.
+	.filter((e, i, all) => all.findIndex((o) => o.message.trim() === e.message.trim()) === i);
 
 if (!entries.length) {
 	console.log("No papercuts found in this session.");

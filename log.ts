@@ -24,7 +24,15 @@ if (!message) {
 }
 
 const model = values.model ?? "unknown";
-const dir = await resolvePapercutsDir(process.cwd());
+const cwd = process.cwd();
+const { dir, inRepo } = await resolvePapercutsDir(cwd);
+// Still log, but loudly: a papercut logged from the wrong place lands in a file nobody reads.
+if (!inRepo) {
+	console.error(`warning: not inside a git repo — logging to ${dir}/PAPERCUTS.md; run it from the repo dir`);
+}
+if (/^(\/private)?\/tmp(\/|$)/.test(cwd)) {
+	console.error(`warning: cwd ${cwd} is under /tmp — logging to ${dir}/PAPERCUTS.md; run it from the repo dir`);
+}
 
 const [record] = await appendPapercuts(dir, [{ model, message }]);
 console.log(`Logged papercut to ${dir}/PAPERCUTS.md`);

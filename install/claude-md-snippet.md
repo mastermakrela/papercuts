@@ -38,9 +38,11 @@ grepping individual repos.
 
 The report shows OPEN papercuts only. When a fix for a logged papercut is in place
 (a hook changed, a rule documented, a prepare script added), consume it:
-`papercuts resolve --grep <substr> [--repo R] [--until YYYY-MM-DD] -m "<what fixed it>"`
-(`-n` previews; or `papercuts resolve <id>... -m …` with ids from `--list`). This
-removes the lines from the affected `PAPERCUTS.md` files and stores the pattern, so a
-later papercut matching it is reported as a possible regression — `papercut` prints a
-hint when you log one. `papercuts unresolve <id>` reopens. Only resolve what you
-verified in code or config, never on a guess.
+`papercuts resolve --grep <substr>... --until <date-the-fix-landed> [--repo R] -m "<what fixed it>"`
+(`-n` previews; or `papercuts resolve <id>... -m …` with ids from `--list`/`--compact`).
+`PAPERCUTS.md` is regenerated from the store's open entries, so the lines disappear
+(and `papercuts unresolve <id>` brings them back); the pattern is stored, so a later
+papercut matching it is reported as a possible regression — `papercut` prints a hint
+when you log one. Use specific substrings, not generic words. `papercuts sync-md -n`
+shows what regenerating a drifted file would change. Only resolve what you verified in
+code or config, never on a guess, and never by citing the rule an entry says it already knew about.

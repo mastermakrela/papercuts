@@ -11,9 +11,10 @@ your global setup) needs sanding down.
 Every papercut lands in two places:
 
 - **`PAPERCUTS.md`** at the repo's main worktree root — the human-readable, per-repo
-  signal. Worktree-safe: logged from a linked worktree, it still lands in the main
-  worktree's file (resolved via `git rev-parse --git-common-dir`), so it survives the
-  worktree being deleted.
+  view of that repo's open papercuts. Worktree-safe: logged from a linked worktree, it
+  still lands in the main worktree's file (resolved via `git rev-parse
+  --git-common-dir`), so it survives the worktree being deleted. `papercut` warns when it is run outside a git repo or under
+  `/tmp` (it still logs, to the cwd).
 - **`~/.claude/papercuts/log.jsonl`** — a global append-only store (repo, branch,
   model, date, source) for querying friction *across* projects. In practice most
   papercuts turn out to be shared global-setup issues, not per-project ones.
@@ -31,8 +32,9 @@ tool.
 | --- | --- |
 | `papercut -m <model> "message"` | Log one papercut from the current directory's repo. Agents call this in the moment, per an instruction in your global `CLAUDE.md`. |
 | `papercut-review` | Mine the *whole current session* for papercuts at once: finds the newest Claude Code transcript for the cwd, feeds it to Haiku via `claude -p --model haiku` (no separate API key needed), appends what it finds. Wired up as the `/papercut` slash command. |
-| `papercuts` | Query the global store: `--repo <substr>`, `--grep <substr>`, `--since`/`--until`/`--year`, `--list` (full text, with ids), `--json`. No flags prints tallies by repo, model, and date — open papercuts only, plus a "possible regressions" section (see below). `--all` includes resolved entries, `--resolved` shows only them. |
-| `papercuts resolve` | Mark papercuts as addressed: `papercuts resolve <id>... -m "what fixed it"` or `papercuts resolve --grep <substr> [--repo R] [--until YYYY-MM-DD] -m "what fixed it"` (`-n` previews). `papercuts unresolve <id>...` reopens. |
+| `papercuts` | Query the global store: `--repo <substr>`, `--grep <substr>`, `--since`/`--until`/`--year`, `--list` (full text, with ids), `--json`. No flags prints tallies by repo, model, and date — open papercuts only, plus a "possible regressions" section (see below). `--all` includes resolved entries, `--resolved` shows only them. The model tally folds spellings (`claude-opus-5-5`, `opus-5.5`) into one name; `--raw-models` shows them as logged. |
+| `papercuts resolve` | Mark papercuts as addressed: `papercuts resolve <id>... -m "what fixed it"` or `papercuts resolve --grep <substr>... --until <fix-date> [--repo R] -m "what fixed it"` (`-n` previews). `papercuts unresolve <id>...` reopens. |
+| `papercuts sync-md` | Regenerate every repo's `PAPERCUTS.md` from the store (`--repo <substr>` to limit, `-n` prints the plan only). |
 
 ## Resolving papercuts
 
@@ -48,14 +50,31 @@ papercuts resolve --grep "paraglide" --repo wirtgen --until 2026-08-20 \
   (next to the log; a `PAPERCUTS_LOG` override redirects both). Entries are
   identified by a stable 8-char id derived from the record itself, so the existing
   store needs no migration. `--list` and `--json` print the ids.
-- `--grep` resolutions store the pattern. A later papercut matching that pattern is
-  evidence the fix did not take: `papercut` prints a hint when logging one, and the
-  report lists them under "possible regressions". `--until` says "fixed by that date"
-  so only newer entries count; without it, newer-than-the-resolution counts.
-- Resolved entries are removed from the affected repos' `PAPERCUTS.md` (exact message
-  match; `--keep-md` skips that). The global store keeps everything.
-- `papercuts unresolve <id>...` reopens entries (the markdown lines are not restored).
+- A pattern resolution needs `--until <date>`: the day the fix landed. Matching
+  entries up to that date are resolved; anything logged after it stays open and is
+  listed under "possible regressions" in the report, and `papercut` prints a hint
+  when it logs one. Resolving without a fix date would quietly swallow the entries
+  that prove the fix did not take, so the flag is mandatory.
+- `--grep` may be repeated: all patterns are stored and any of them counts. Prefer
+  specific substrings (`"SHA must be provided"`) over generic words (`"modifier"`),
+  or the regression list fills with unrelated matches.
+- `PAPERCUTS.md` is a derived view: `resolve` and `unresolve` regenerate the file of
+  every affected repo from the store — all OPEN entries logged for that directory,
+  under `## YYYY-MM-DD` headers, written atomically (temp file + rename). So resolving
+  removes the lines and `unresolve <id>...` brings them back. `--keep-md` leaves the
+  files alone. The global store keeps everything.
+- `papercut` and `papercut-review` only append to the file. If its bullet count then
+  disagrees with the store, they print a note and leave it as is; `papercuts sync-md`
+  regenerates on demand (`-n` first to see the plan).
+- Regeneration drops any bullet that has no entry in the store for that directory
+  (hand-written lines, lines from before the store existed, lines logged under a
+  different repo path). Each run prints them as "dropped (not in store for this dir)"
+  so you notice; check `-n` before syncing a file you edited by hand. A file is created
+  only for a directory that has open entries, never for an empty one.
+- Ids derive from the stored `ts` + message, so editing a line in `log.jsonl` changes
+  its id and orphans any resolution that named it. Do not edit the log.
 - A pattern starting with a dash needs the `=` form: `--grep=--attach`.
+- `--compact` is `--list` with one short line per entry (id, date, first 100 chars).
 
 ## Setup
 

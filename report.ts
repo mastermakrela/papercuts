@@ -4,15 +4,23 @@
  *
  * Usage:
  *   papercuts [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--year YYYY] [--repo <substr>]
- *             [--grep <substr>] [--all | --resolved] [--list] [--json]
+ *             [--grep <substr>]... [--all | --resolved] [--list | --compact] [--json]
  *   papercuts resolve <id>... -m "<what fixed it>" [--keep-md]
- *   papercuts resolve --grep <substr> [--repo <substr>] [--since D] [--until D]
+ *   papercuts resolve --grep <substr>... --until <fix-date> [--repo <substr>] [--since D]
  *             -m "<what fixed it>" [-n] [--keep-md]
- *   papercuts unresolve <id>...
+ *   papercuts unresolve <id>... [--keep-md]
+ *   papercuts sync-md [--repo <substr>] [-n]
  *
  * The default report hides resolved entries; `--all` includes them, `--resolved`
- * shows only them. Ids are printed by `--list` and `--json`. A pattern that starts
- * with a dash must be written as `--grep=--flag`.
+ * shows only them. Ids are printed by `--list`, `--compact` and `--json`. `--grep`
+ * may be repeated (any match counts); a pattern that starts with a dash must be
+ * written as `--grep=--flag`. A pattern resolution needs `--until`: the date the fix
+ * landed, so matching entries logged after it stay open and are flagged.
+ *
+ * Each repo's PAPERCUTS.md is a view of its open entries in the store: resolve and
+ * unresolve regenerate the affected files (unless --keep-md), sync-md regenerates
+ * every file (or those of --repo); -n prints the plan only. The "By model" tally
+ * folds spellings of the same model together; --raw-models shows them as logged.
  */
 import { parseArgs } from "util";
 import {
@@ -20,12 +28,15 @@ import {
 	entryId,
 	isResolution,
 	matchesGrep,
-	pruneFromMarkdown,
+	normalizeModel,
+	patternsOf,
 	readGlobal,
 	readResolutions,
+	regenerateMarkdowns,
 	regressionsOf,
 	resolvedIndex,
 	today,
+	type MarkdownSync,
 	type PapercutRecord,
 	type Resolution,
 } from "./common.ts";
@@ -37,14 +48,16 @@ const { values, positionals } = parseArgs({
 		until: { type: "string" },
 		year: { type: "string" },
 		repo: { type: "string" },
-		grep: { type: "string" },
+		grep: { type: "string", multiple: true },
 		json: { type: "boolean" },
 		list: { type: "boolean" },
+		compact: { type: "boolean" },
 		all: { type: "boolean" },
 		resolved: { type: "boolean" },
 		message: { type: "string", short: "m" },
 		"dry-run": { type: "boolean", short: "n" },
 		"keep-md": { type: "boolean" },
+		"raw-models": { type: "boolean" },
 	},
 	strict: true,
 	allowPositionals: true,
@@ -74,7 +87,7 @@ function applyFilters(records: Annotated[]): Annotated[] {
 	if (since) records = records.filter((r) => r.date >= since);
 	if (until) records = records.filter((r) => r.date <= until);
 	if (values.repo) records = records.filter((r) => r.repo.includes(values.repo!));
-	if (values.grep) records = records.filter((r) => matchesGrep(r.message, values.grep!));
+	if (values.grep?.length) records = records.filter((r) => matchesGrep(r.message, values.grep!));
 	return records;
 }
 
@@ -83,34 +96,42 @@ function fail(msg: string): never {
 	process.exit(1);
 }
 
-async function pruneMarkdown(targets: Annotated[]) {
-	if (values["keep-md"]) return;
-	const byDir = new Map<string, string[]>();
-	for (const t of targets) byDir.set(t.repoPath, [...(byDir.get(t.repoPath) ?? []), t.message]);
-	let files = 0;
-	let lines = 0;
-	for (const [dir, messages] of byDir) {
-		const n = await pruneFromMarkdown(dir, messages);
-		if (n) {
-			files++;
-			lines += n;
-		}
+function printSync(results: MarkdownSync[], dryRun: boolean) {
+	for (const r of results) {
+		const verb = r.existed ? ["would rewrite", "rewritten"] : ["would create", "created"];
+		const state = !r.changed ? "unchanged" : verb[dryRun ? 0 : 1];
+		const dropped = r.dropped ? `, ${r.dropped} dropped (not in store for this dir)` : "";
+		console.log(`  ${r.path}: ${r.before} bullets → ${r.after} bullets${dropped} [${state}]`);
 	}
-	if (lines) console.log(`Pruned ${lines} line(s) from ${files} PAPERCUTS.md file(s).`);
+}
+
+/** resolve/unresolve: re-derive the PAPERCUTS.md of every repo the change touched. */
+async function syncMarkdown(targets: Annotated[]) {
+	if (values["keep-md"]) return;
+	const results = await regenerateMarkdowns(targets.map((t) => t.repoPath));
+	if (results.length) console.log("PAPERCUTS.md:");
+	printSync(results, false);
 }
 
 if (subcommand === "resolve") {
 	const note = values.message?.trim();
 	if (!note) fail('resolve needs -m "<what fixed it>"');
 
+	const patterns = values.grep ?? [];
 	let targets: Annotated[];
 	if (ids.length) {
-		if (values.grep) fail("resolve takes either ids or --grep, not both");
+		if (patterns.length) fail("resolve takes either ids or --grep, not both");
 		const byId = new Map(everything.map((r) => [r.id, r]));
 		const unknown = ids.filter((id) => !byId.has(id));
 		if (unknown.length) fail(`Unknown id(s): ${unknown.join(", ")}`);
 		targets = ids.map((id) => byId.get(id)!);
-	} else if (values.grep) {
+	} else if (patterns.length) {
+		if (values.year) fail("resolve --grep takes --until <fix-date>, not --year");
+		if (!until || !/^\d{4}-\d{2}-\d{2}$/.test(until)) {
+			fail(
+				"resolve --grep needs --until <YYYY-MM-DD>: the date the fix landed. Entries up to that date are resolved; later matches stay open and are reported as possible regressions.",
+			);
+		}
 		targets = applyFilters(everything.filter((r) => !r.resolved));
 	} else {
 		fail("resolve needs ids or --grep <substr>");
@@ -132,15 +153,17 @@ if (subcommand === "resolve") {
 		date: today(),
 		ids: targets.map((r) => r.id),
 		note,
-		...(values.grep ? { grep: values.grep } : {}),
-		...(values.grep && values.repo ? { repo: values.repo } : {}),
-		...(values.grep && until ? { until } : {}),
+		...(patterns.length ? { grep: patterns.length === 1 ? patterns[0]! : patterns } : {}),
+		...(patterns.length && values.repo ? { repo: values.repo } : {}),
+		...(patterns.length && until ? { until } : {}),
 	};
 	await appendResolution(record);
 	console.log(`Resolved ${targets.length} papercut(s): ${record.ids.join(" ")}`);
 	console.log(`  note: ${note}`);
-	if (record.grep) console.log(`  later entries matching "${record.grep}" will be reported as possible regressions`);
-	await pruneMarkdown(targets);
+	if (patterns.length) {
+		console.log(`  entries after ${until} matching "${patterns.join('" | "')}" will be reported as possible regressions`);
+	}
+	await syncMarkdown(targets);
 	process.exit(0);
 }
 
@@ -149,13 +172,28 @@ if (subcommand === "unresolve") {
 	const unknown = ids.filter((id) => !index.has(id));
 	if (unknown.length) fail(`Not currently resolved: ${unknown.join(", ")}`);
 	await appendResolution({ ts: new Date().toISOString(), date: today(), revokes: ids });
-	console.log(`Reopened ${ids.length} papercut(s): ${ids.join(" ")} (PAPERCUTS.md lines are not restored).`);
+	console.log(`Reopened ${ids.length} papercut(s): ${ids.join(" ")}`);
+	await syncMarkdown(everything.filter((r) => ids.includes(r.id)));
 	process.exit(0);
 }
 
-if (subcommand) fail(`Unknown subcommand '${subcommand}' (expected: resolve, unresolve)`);
-if (values.message || values["dry-run"] || values["keep-md"]) fail("-m / -n / --keep-md only apply to resolve");
+if (subcommand === "sync-md") {
+	if (ids.length) fail("sync-md takes no positional arguments (use --repo <substr>)");
+	const dirs = everything.filter((r) => !values.repo || r.repo.includes(values.repo)).map((r) => r.repoPath);
+	const dryRun = !!values["dry-run"];
+	const results = await regenerateMarkdowns(dirs, { dryRun });
+	if (!results.length) fail("No PAPERCUTS.md to regenerate (no existing repo dir with a file or open entries).");
+	printSync(results, dryRun);
+	const changed = results.filter((r) => r.changed).length;
+	const dropped = results.reduce((n, r) => n + r.dropped, 0);
+	console.log(`${dryRun ? "Would rewrite" : "Rewrote"} ${changed} of ${results.length} file(s)${dropped ? `; ${dropped} line(s) dropped (not in store for their dir)` : ""}.`);
+	process.exit(0);
+}
+
+if (subcommand) fail(`Unknown subcommand '${subcommand}' (expected: resolve, unresolve, sync-md)`);
+if (values.message || values["dry-run"] || values["keep-md"]) fail("-m / -n / --keep-md only apply to resolve / unresolve / sync-md");
 if (values.all && values.resolved) fail("--all and --resolved are mutually exclusive");
+if (values.list && values.compact) fail("--list and --compact are mutually exclusive");
 
 // ---------------------------------------------------------------------------
 // Report
@@ -200,7 +238,7 @@ for (const [repo, n] of byRepo) {
 	console.log(`  ${n.toString().padStart(3)}  ${bar(n, byRepo[0]![1]).padEnd(25)} ${repo}`);
 }
 
-const byModel = tally((r) => r.model);
+const byModel = tally((r) => (values["raw-models"] ? r.model : normalizeModel(r.model)));
 console.log(`\nBy model`);
 for (const [model, n] of byModel) console.log(`  ${n.toString().padStart(3)}  ${model}`);
 
@@ -214,15 +252,17 @@ if (regressions.length && !values.resolved) {
 	for (const r of regressions) {
 		const res = r.regressionOf![0]!;
 		console.log(`- [${r.id}] [${r.date}] ${r.repo}: ${r.message.slice(0, 120)}`);
-		console.log(`    ↳ resolved ${res.date} via "${res.grep}": ${res.note}`);
+		console.log(`    ↳ resolved ${res.date} via "${patternsOf(res).join('" | "')}": ${res.note}`);
 	}
 }
 
 const line = (r: Annotated) =>
-	`- [${r.id}] [${r.date}] (${r.model}) ${r.message}` +
-	(r.resolved ? `\n    ✓ resolved ${r.resolved.date}: ${r.resolved.note}` : "");
+	values.compact
+		? `- [${r.id}] [${r.date}] ${r.message.slice(0, 100)}${r.message.length > 100 ? "…" : ""}${r.resolved ? " ✓" : ""}`
+		: `- [${r.id}] [${r.date}] (${r.model}) ${r.message}` +
+			(r.resolved ? `\n    ✓ resolved ${r.resolved.date}: ${r.resolved.note}` : "");
 
-if (values.list) {
+if (values.list || values.compact) {
 	console.log(`\n${"─".repeat(70)}`);
 	const grouped = new Map<string, Annotated[]>();
 	for (const r of records) {
@@ -239,7 +279,8 @@ const resolutions = resolutionRecords.filter(isResolution);
 if (values.resolved && resolutions.length) {
 	console.log(`\nResolutions (${resolutions.length})`);
 	for (const r of resolutions) {
-		console.log(`- ${r.date} ${r.ids.length.toString().padStart(3)} entr${r.ids.length === 1 ? "y" : "ies"}${r.grep ? ` grep="${r.grep}"` : ""}${r.repo ? ` repo=${r.repo}` : ""}: ${r.note}`);
+		const pats = patternsOf(r);
+		console.log(`- ${r.date} ${r.ids.length.toString().padStart(3)} entr${r.ids.length === 1 ? "y" : "ies"}${pats.length ? ` grep="${pats.join('" | "')}"` : ""}${r.until ? ` fixed-by=${r.until}` : ""}${r.repo ? ` repo=${r.repo}` : ""}: ${r.note}`);
 	}
 }
 console.log();
