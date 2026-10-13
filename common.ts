@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { appendFile, mkdir, readFile, rename, stat } from "node:fs/promises";
+import { appendFile, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { $ } from "bun";
 
@@ -73,7 +73,13 @@ export async function resolvePapercutsDir(cwd: string): Promise<{ dir: string; i
 	try {
 		const out = (await $`git -C ${cwd} rev-parse --git-common-dir`.quiet()).stdout.toString().trim();
 		if (!out) return { dir: cwd, inRepo: false };
-		return { dir: dirname(resolve(cwd, out)), inRepo: true };
+		const common = resolve(cwd, out);
+		// shortcut: a submodule's git dir sits inside the parent's .git, so use its own top level;
+		// a linked worktree of a submodule then gets its own file, not the main worktree's.
+		if (common.includes("/.git/modules/")) {
+			return { dir: (await $`git -C ${cwd} rev-parse --show-toplevel`.quiet()).stdout.toString().trim(), inRepo: true };
+		}
+		return { dir: dirname(common), inRepo: true };
 	} catch {
 		return { dir: cwd, inRepo: false };
 	}
@@ -193,17 +199,21 @@ export async function appendPapercuts(
 	const file = `${dir}/PAPERCUTS.md`;
 
 	const f = Bun.file(file);
-	const content = (await f.exists()) ? await f.text() : MD_HEADER;
+	const exists = await f.exists();
+	const content = exists ? await f.text() : MD_HEADER;
 
 	const day = today();
 	const headers = [...content.matchAll(/^## (.+)$/gm)];
 	const lastHeader = headers.at(-1)?.[1];
 
-	let out = content.trimEnd() + "\n";
+	// Append only: rewriting the whole file loses the lines of parallel instances.
+	// Parallel first writes of a day can repeat its `## day` header; no line is lost.
+	let out = exists && !content.endsWith("\n") ? "\n" : "";
 	if (lastHeader !== day) out += `\n## ${day}\n\n`;
 	out += entries.map(bullet).join("\n") + "\n";
 
-	await Bun.write(file, out);
+	if (!exists) await writeFile(file, MD_HEADER, { flag: "wx" }).catch(() => {}); // lost the creation race: file exists now
+	await appendFile(file, out);
 
 	const ts = new Date().toISOString();
 	const branch = await currentBranch(dir);

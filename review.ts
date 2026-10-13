@@ -9,11 +9,12 @@ import {
 } from "./common.ts";
 
 const sessionCwd = process.argv[2] ?? process.cwd();
-const encoded = sessionCwd.replace(/[/.]/g, "-");
+// Claude Code names the project dir after the path with every non-alphanumeric character as "-".
+const encoded = sessionCwd.replace(/[^a-zA-Z0-9]/g, "-");
 const transcriptsDir = `${process.env.HOME}/.claude/projects/${encoded}`;
 const { dir: papercutsDir } = await resolvePapercutsDir(sessionCwd);
 
-const files = (await readdir(transcriptsDir)).filter((f) => f.endsWith(".jsonl"));
+const files = (await readdir(transcriptsDir).catch(() => [])).filter((f) => f.endsWith(".jsonl"));
 if (!files.length) {
 	console.error(`No session transcripts found in ${transcriptsDir}`);
 	process.exit(1);
@@ -86,7 +87,7 @@ ${transcriptText}
 
 const proc = Bun.spawn(
 	["claude", "-p", "--model", "haiku", "--max-turns", "1", "--disallowedTools", "Task,Agent,Skill,Workflow"],
-	{ stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+	{ stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 180_000 }, // a hung call must not hang /papercut
 );
 proc.stdin.write(prompt);
 proc.stdin.end();
@@ -98,7 +99,7 @@ const [out, err, code] = await Promise.all([
 ]);
 
 if (code !== 0) {
-	console.error(`claude -p failed:\n${err}`);
+	console.error(`claude -p failed (exit ${code}${proc.killed ? ", timed out" : ""}):\n${err}`);
 	process.exit(1);
 }
 
