@@ -87,7 +87,7 @@ ${transcriptText}
 
 const proc = Bun.spawn(
 	["claude", "-p", "--model", "haiku", "--max-turns", "1", "--disallowedTools", "Task,Agent,Skill,Workflow"],
-	{ stdin: "pipe", stdout: "pipe", stderr: "pipe" },
+	{ stdin: "pipe", stdout: "pipe", stderr: "pipe", timeout: 180_000 }, // a hung call must not hang /papercut
 );
 proc.stdin.write(prompt);
 proc.stdin.end();
@@ -99,7 +99,7 @@ const [out, err, code] = await Promise.all([
 ]);
 
 if (code !== 0) {
-	console.error(`claude -p failed:\n${err}`);
+	console.error(`claude -p failed (exit ${code}${proc.killed ? ", timed out" : ""}):\n${err}`);
 	process.exit(1);
 }
 
