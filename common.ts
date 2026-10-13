@@ -73,7 +73,13 @@ export async function resolvePapercutsDir(cwd: string): Promise<{ dir: string; i
 	try {
 		const out = (await $`git -C ${cwd} rev-parse --git-common-dir`.quiet()).stdout.toString().trim();
 		if (!out) return { dir: cwd, inRepo: false };
-		return { dir: dirname(resolve(cwd, out)), inRepo: true };
+		const common = resolve(cwd, out);
+		// shortcut: a submodule's git dir sits inside the parent's .git, so use its own top level;
+		// a linked worktree of a submodule then gets its own file, not the main worktree's.
+		if (common.includes("/.git/modules/")) {
+			return { dir: (await $`git -C ${cwd} rev-parse --show-toplevel`.quiet()).stdout.toString().trim(), inRepo: true };
+		}
+		return { dir: dirname(common), inRepo: true };
 	} catch {
 		return { dir: cwd, inRepo: false };
 	}
