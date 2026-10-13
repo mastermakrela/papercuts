@@ -9,11 +9,12 @@ import {
 } from "./common.ts";
 
 const sessionCwd = process.argv[2] ?? process.cwd();
-const encoded = sessionCwd.replace(/[/.]/g, "-");
+// Claude Code names the project dir after the path with every non-alphanumeric character as "-".
+const encoded = sessionCwd.replace(/[^a-zA-Z0-9]/g, "-");
 const transcriptsDir = `${process.env.HOME}/.claude/projects/${encoded}`;
 const { dir: papercutsDir } = await resolvePapercutsDir(sessionCwd);
 
-const files = (await readdir(transcriptsDir)).filter((f) => f.endsWith(".jsonl"));
+const files = (await readdir(transcriptsDir).catch(() => [])).filter((f) => f.endsWith(".jsonl"));
 if (!files.length) {
 	console.error(`No session transcripts found in ${transcriptsDir}`);
 	process.exit(1);
