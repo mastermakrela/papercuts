@@ -2,14 +2,7 @@
 /**
  * Query the global papercut store across all projects, and mark papercuts as resolved.
  *
- * Usage:
- *   papercuts [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--year YYYY] [--repo <substr>]
- *             [--grep <substr>]... [--all | --resolved] [--list | --compact] [--json]
- *   papercuts resolve <id>... -m "<what fixed it>" [--keep-md]
- *   papercuts resolve --grep <substr>... --until <fix-date> [--repo <substr>] [--since D]
- *             -m "<what fixed it>" [-n] [--keep-md]
- *   papercuts unresolve <id>... [--keep-md]
- *   papercuts sync-md [--repo <substr>] [-n]
+ * Usage: see USAGE below (also printed by --help).
  *
  * The default report hides resolved entries; `--all` includes them, `--resolved`
  * shows only them. Ids are printed by `--list`, `--compact` and `--json`. `--grep`
@@ -58,10 +51,24 @@ const { values, positionals } = parseArgs({
 		"dry-run": { type: "boolean", short: "n" },
 		"keep-md": { type: "boolean" },
 		"raw-models": { type: "boolean" },
+		help: { type: "boolean", short: "h" },
 	},
 	strict: true,
 	allowPositionals: true,
 });
+
+const USAGE = `Usage:
+  papercuts [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--year YYYY] [--repo <substr>]
+            [--grep <substr>]... [--all | --resolved] [--list | --compact] [--json] [--raw-models]
+  papercuts resolve <id>... -m "<what fixed it>" [--keep-md]
+  papercuts resolve --grep <substr>... --until <fix-date> [--repo <substr>] [--since D]
+            -m "<what fixed it>" [-n] [--keep-md]
+  papercuts unresolve <id>... [--keep-md]
+  papercuts sync-md [--repo <substr>] [-n]`;
+if (values.help) {
+	console.log(USAGE);
+	process.exit(0);
+}
 
 const [subcommand, ...ids] = positionals;
 

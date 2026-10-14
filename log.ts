@@ -12,14 +12,21 @@ const { values, positionals } = parseArgs({
 	args: Bun.argv.slice(2),
 	options: {
 		model: { type: "string", short: "m" },
+		help: { type: "boolean", short: "h" },
 	},
 	strict: true,
 	allowPositionals: true,
 });
 
+const USAGE = 'Usage: papercut -m <model> "message"';
+if (values.help) {
+	console.log(USAGE);
+	process.exit(0);
+}
+
 const message = positionals.join(" ").trim();
 if (!message) {
-	console.error('Usage: papercut -m <model> "message"');
+	console.error(USAGE);
 	process.exit(1);
 }
 
